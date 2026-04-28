@@ -225,6 +225,34 @@
                 if (playMode !== 'single') nextSong();
             };
 
+            if (navigator.mediaSession) {
+                navigator.mediaSession.setActionHandler('play', () => togglePlay());
+                navigator.mediaSession.setActionHandler('pause', () => togglePlay());
+                navigator.mediaSession.setActionHandler('previoustrack', () => prevSong());
+                navigator.mediaSession.setActionHandler('nexttrack', () => nextSong());
+                navigator.mediaSession.setActionHandler('seekbackward', () => { audio.currentTime = Math.max(0, audio.currentTime - 10); });
+                navigator.mediaSession.setActionHandler('seekforward', () => { audio.currentTime = Math.min(audio.duration, audio.currentTime + 10); });
+            }
+
+            document.addEventListener('keydown', function(e) {
+                if (e.code === 'MediaPlayPause' || e.code === 'MediaStop') {
+                    e.preventDefault();
+                    togglePlay();
+                } else if (e.code === 'MediaNextTrack') {
+                    e.preventDefault();
+                    nextSong();
+                } else if (e.code === 'MediaPreviousTrack') {
+                    e.preventDefault();
+                    prevSong();
+                } else if (e.code === 'MediaSeekBackward') {
+                    e.preventDefault();
+                    audio.currentTime = Math.max(0, audio.currentTime - 10);
+                } else if (e.code === 'MediaSeekForward') {
+                    e.preventDefault();
+                    audio.currentTime = Math.min(audio.duration, audio.currentTime + 10);
+                }
+            });
+
             $('#searchInput').keypress(function(e) { if (e.which == 13) searchSongs(); });
         });
 
@@ -261,7 +289,7 @@
                             <div class="song-artist">${s.artist}</div>
                         </div>
                         <div class="song-actions">
-                            <i class="fa fa-plus" onclick="event.stopPropagation(); addToPlaylist(${i}, '${type}')"></i>
+                            ${type === 'playlist' ? `<i class="fa fa-times" onclick="event.stopPropagation(); removeFromPlaylist(${i})"></i>` : `<i class="fa fa-plus" onclick="event.stopPropagation(); addToPlaylist(${i}, '${type}')"></i>`}
                             <i class="fa fa-heart${isFavorite(s.id) ? '' : '-o'}" onclick="event.stopPropagation(); toggleFav(${i}, '${type}')"></i>
                         </div>
                     </div>
@@ -283,6 +311,13 @@
                     renderFavList();
                 }
             } catch (e) { alert('获取失败'); }
+        }
+
+        function removeFromPlaylist(idx) {
+            playlist.splice(idx, 1);
+            if (currentIndex >= playlist.length) currentIndex = playlist.length - 1;
+            if (currentIndex < 0) currentIndex = -1;
+            renderPlaylist();
         }
 
         function renderPlaylist() {
@@ -356,6 +391,12 @@
             isPlaying = true;
             updatePlayBtn();
             renderPlaylist();
+            if (navigator.mediaSession) {
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: s.title,
+                    artist: s.artist,
+                });
+            }
         }
 
         function playlistSong(idx) { searchSong(idx); }
@@ -366,6 +407,9 @@
             isPlaying ? audio.pause() : audio.play();
             isPlaying = !isPlaying;
             updatePlayBtn();
+            if (navigator.mediaSession) {
+                navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+            }
         }
 
         function updatePlayBtn() {
